@@ -1,0 +1,199 @@
+---
+title: "Rapport technique"
+author: "Alexis BERNARD"
+date: "5/24/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Objets perdus en gare SNCF
+
+Ce document a pour but d'analyser les données partagées par la SNCF sujet des objets perdus.
+
+**667 000**.
+C'est le nombre d'objets perdus recensés par la SNCF ces 10 dernières années. Il peut s'évéré compliquer de se représenter un tel nombre, c'est pourquoi je vous l'indique : cela représente un objet perdu **toutes les huit minutes**.
+
+## Comment évolue le nombre d'objets perdus au cours des années ?
+
+Un **individu** est un objet perdu durant une quenconque année.  
+La **population** totale est de x objets (inconnue).  
+
+On considère un échantillon de données auquel nous supprimons les valeurs des années 2013 et 2022, car les données ne concernent pas tous les mois sur ces périodes. Cet échantillon correspond aux objets perdus recensés par la SNCF.
+
+Voici l'évolution du nombre d'objets perdus par année sur cet échantillon:
+
+```{r, echo=FALSE}
+library(readr)
+library(ggplot2)
+library(forcats)
+library(dplyr)
+library(ggforce)
+
+objets_trouves <- read_delim(
+  "../data/parsed-objets-trouves-restitution.csv",
+  delim = ";",
+  escape_double = FALSE,
+  trim_ws = TRUE,
+  show_col_types = FALSE)
+
+objets_trouves <- subset(objets_trouves, year != 2013 & year != 2022)
+
+ggplot(data=objets_trouves,
+       aes(
+         x=as.character(year),
+         )
+       ) +
+  geom_bar(
+    fill="cyan"
+  ) +
+  ggtitle("Évolution du nombre d'objets perdus chaque année") +
+  xlab("Année") +
+  ylab("Nombre d'objets perdus") +
+  geom_text(stat='count', aes(label=..count..), vjust=3) +
+  theme_minimal()
+```
+
+On voit ici qu'il y a moins d'objets perdus déplacés par la SNCF ces dernières années.  
+On pourrait conclure tout simplement que les voyageurs font plus attention à leurs affaires personnelles, mais ça n'est pas réellement le cas. La raison de cette baisse est la crise sanitaire. En effet, cette crise a drastiquement réduit le nombre de voyages faits en train. Cela explique que moins d'objets ont été perdus pendant dette période.
+
+## Quelle est la période de l'année ou le plus d'objets sont perdus ?
+
+On pourrait se demander quel est le mois de l'année ou les voyageurs perdent le plus d'objets.  
+Voici une autre représentation de ces mêmes données, mais cette fois-ci regroupés par mois:
+
+```{r, echo=FALSE}
+ggplot(data=objets_trouves,
+       aes(
+         x=fct_relevel(month, "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"),
+         )
+       ) +
+  geom_bar(
+    fill="cyan"
+  ) +
+  ggtitle("Nombre d'objets perdus par mois, regroupant toutes les années") +
+  xlab("Mois") +
+  ylab("Nombre d'objets perdus") +
+  geom_text(stat='count', aes(label=..count..), vjust=3) +
+  theme_minimal()
+```
+
+À première vue, on pourrait se dire que les voyageurs ont tendance à perdre plus d'objets durant l'été.  
+Cependant, ce graphe est biaisé par le nombre de voyageurs total. En effet, il est certain que durant l'été, beaucoup plus de monde prend le train pour partir en vacances, ce qui explique le fait qu'il y a davantage d'objets perdus.  
+Ce graphe n'est dont pas représentatif.
+
+## Quels sont les types d'objets les plus perdus par les voyageurs ?
+
+Voici maintenant un apperçu du type des objets perdus, toutes années confondues, et sous deux formes de représentations différentes:
+
+```{r, echo=FALSE, warning=FALSE}
+objets_trouves_type <- objets_trouves %>% 
+  group_by(`Nature d'objets`) %>% 
+  summarise(amount = n()) %>% 
+  arrange(desc(amount)) %>% 
+  slice(1:8)
+
+ggplot(objets_trouves_type,
+       aes(x0 = 0, y0 = 0, r0 = 0, r = 1,
+           amount = amount,
+           fill = `Nature d'objets`)
+       ) +
+  ggtitle("8 types d'objets les plus perdus") +
+  xlab("") +
+  ylab("") +
+  coord_fixed() +
+  geom_arc_bar(stat = "pie") +
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x=element_blank(),
+    axis.ticks.x=element_blank(),
+    axis.text.y=element_blank(),
+    axis.ticks.y=element_blank()
+    )
+
+ggplot(objets_trouves_type,
+       aes(x = `Nature d'objets`,
+           y = amount,
+           fill = `Nature d'objets`)
+       ) +
+  geom_col() +
+  coord_flip() +
+  ggtitle("8 types d'objets les plus perdus") +
+  xlab("Type") +
+  ylab("Nombre d'objets perdus") +
+  theme_minimal() +
+  theme(
+    axis.text.y=element_blank(),
+    axis.ticks.y=element_blank()
+    )
+```
+
+On apperçoit ici que les objets les plus souvent perdus sont les porte monnaies et portefeuilles. Cela n'est pas tellement étonnant vu que ce genre de choses se trouve généralement dans les poches, et il peut assez facilement arriver qu'ils en tombent, sans s'en rendre compte.  
+Il faut noter cependant que sur ces huit années, plus de 60.000 portefeuilles ont été perdus. Cela représente **plus de 20 portefeuilles par jour** ! C'est énorme. Et cela correspond uniquement a ce que la SNCF a retrouvé.
+
+## Quels type d'objets sont le plus souvent retrouvés ?
+
+On pourrait se demander quel type d'objet les voyageurs tiennent-ils le plus.
+Pour cela, voici maintenant la représentation des 8 objets le plus récupérées:
+
+```{r, echo=FALSE, warning=FALSE}
+objets_trouves_type_lines <- subset(objets_trouves, `Nature d'objets` %in% objets_trouves_type$`Nature d'objets`)
+
+objets_retrouves_type <- objets_trouves_type_lines %>% 
+  group_by(`Nature d'objets`, found) %>% 
+  summarise(amount = n()) %>% 
+  mutate(start = head(cumsum(c(0, amount)), -1),
+       end = cumsum(amount),
+       start = start / max(end) * 2 * pi,
+       end = end / max(end) * 2 * pi,
+       mid = (start + end)/2)
+
+rpie = 1
+rlabel = 0.6 * rpie
+
+ggplot(objets_retrouves_type) + 
+  ggforce::geom_arc_bar(
+    aes(x0 = 0, 
+        y0 = 0, 
+        r0 = 0, 
+        r = rpie, 
+        start = start, 
+        end = end, 
+        fill = found)
+    ) +
+  xlab("") +
+  ylab("") +
+  coord_fixed() +
+  geom_text(aes(x = rlabel*sin(mid), y = rlabel*cos(mid), label = amount), hjust = 0.5, vjust = 0.5) +
+  scale_x_continuous(limits = c(-1, 1), name = "", breaks = NULL, labels = NULL) +
+  scale_y_continuous(limits = c(-1, 1), name = "", breaks = NULL, labels = NULL) +
+  facet_wrap(substr(`Nature d'objets`, 1, 18)~.) +
+  theme_minimal()
+```
+
+On observe premièrement ici qu'un certain nombres d'objets sont en effet retrouvés.  
+Sans trop de surprises, nous voyons que les objets **les plus retrouvés** par leurs propriétaires sont les valises et les sacs. Cela peut s'expliquer car il est maintenant obligatoire d'étiqueter ses bagages, avec son nom, prénom, et numéro de téléphone.
+Plus étonnant, sur ces huit types d'objets, le second type d'objet **le moins retrouvé** est la carte d'identité.  
+Je trouve cela très étrange, car absolument toutes les informations nécessaires à retrouver son propriétaire y figurent.  
+
+## Bonus : Quel a été la durée la plus longue avant qu'un objet ne retrouve son propriétaire ?
+
+Pour cette question, les données prises en comptes concernent les dix années de données entières, et non les huit complètement remplies.
+
+```{r, echo=FALSE}
+best_delta <- objets_trouves %>% 
+  arrange(desc(delta)) %>% 
+  slice(1:5) %>% 
+  select(Gare, `Nature d'objets`, delta)
+
+best_delta
+```
+
+Sur ce tableau très peu lisible, on peut voir que l'objet ayant été perdu pour le plus grand laps de temps est un porte-monnaie. Il a été retrouvé **2968** jours après sa perte (8 ans, 1 mois et 17 jours).
+
+Encore plus étonnant, un vêtement à été retrouvé **2416** jours après sa perte (6 ans et 7 mois). On se demande bien comment il fût retoruvé, car contrairement aux porte-monnaies, il n'y avait probablement pas de nom inscrit dessus.
